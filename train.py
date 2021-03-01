@@ -26,8 +26,9 @@ batch_size = 16
 num_workers = 4
 total_epoch = 15
 learning_rate = 0.0001
+target_features = []
 
-model_name = 'cnn'
+model_name = 'mlp'
 
 
 def main():
@@ -52,12 +53,12 @@ def split_k_fold(k):
     dataset = None
     test_dataset = None
     if model_name == 'mlp' or model_name == 'knn':
-        dataset = HaptDataset(train_x_data_path, train_y_data_path)
-        test_dataset = HaptDataset(test_x_data_path, test_y_data_path)
+        dataset = HaptDataset(train_x_data_path, train_y_data_path, target_features=target_features)
+        test_dataset = HaptDataset(test_x_data_path, test_y_data_path, target_features=target_features)
     elif model_name == 'cnn':
         dataset = HaptRawDataset(raw_json_path, Float16ToInt8())
     fold_length = len(dataset) // k
-    fold_length_list = [fold_length for _ in range(k)]
+    fold_length_list = [fold_length for _ in range(k-1)] + [len(dataset) - fold_length * (k - 1)]
     fold_dataset_list = random_split(dataset, fold_length_list, generator=torch.Generator().manual_seed(7))
     return fold_dataset_list, test_dataset
 
@@ -159,7 +160,8 @@ def train_mlp(train_dataset, val_dataset, test_dataset):
     cudnn.benchmark = True
     torch.backends.cudnn.deterministic = False
     torch.backends.cudnn.enabled = True
-    config = {'input_size': 561, 'output_size': 12, 'print_freq': 100}
+    input_size = train_dataset.datasets[0].dataset.input_size()
+    config = {'input_size': input_size, 'output_size': 12, 'print_freq': 100}
     model = HaptMlpModel(config).cuda()
     model = nn.DataParallel(model).cuda()
     criterion = nn.CrossEntropyLoss().cuda()

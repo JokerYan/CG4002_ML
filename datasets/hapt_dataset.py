@@ -1,5 +1,5 @@
-import os
-import cv2
+import re
+
 import torch
 import numpy as np
 from torch.utils.data import Dataset
@@ -13,12 +13,15 @@ def array_to_one_hot(array, max_class=None):
     return one_hot
 
 class HaptDataset(Dataset):
-    def __init__(self, x_file_path, y_file_path, transform=None):
+    def __init__(self, x_file_path, y_file_path, transform=None, target_features=None):
         self.transform = transform
         with open(x_file_path, 'r') as x_file:
             lines = x_file.readlines()
             data_str_list = [line.strip().split(" ") for line in lines]
             self.input_list = np.array([[float(x) for x in data_point] for data_point in data_str_list])
+
+        if target_features:
+            self.select_feature(target_features)
 
         with open(y_file_path, 'r') as y_file:
             lines = y_file.readlines()
@@ -45,3 +48,18 @@ class HaptDataset(Dataset):
 
     def normalize(self, mean, std):
         self.input_list = (self.input_list - mean) / std
+
+    def select_feature(self, target_features):
+        with open('features.txt', 'r') as feature_list_file:
+            feature_list = [line.strip() for line in feature_list_file.readlines()]
+        feature_idx_list = []
+        for i, feature in enumerate(feature_list):
+            for target_feature in target_features:
+                if re.search(target_feature, feature):
+                    feature_idx_list.append(i)
+                    break
+        self.input_list = self.input_list[:, feature_idx_list]
+        return self.input_list
+
+    def input_size(self):
+        return self.input_list.shape[1]
