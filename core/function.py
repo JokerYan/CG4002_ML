@@ -1,5 +1,8 @@
 import torch
 import time
+import numpy as np
+
+from sklearn.metrics import accuracy_score, f1_score
 
 from core.evaluate import cal_accuracy
 
@@ -61,15 +64,19 @@ def validate(cfg, val_loader, model, criterion, epoch, summary, phase="val"):
 
     model.eval()
     end = time.time()
+    targets = np.asarray([])
+    outputs = np.asarray([])
     with torch.no_grad():
         for i, data in enumerate(val_loader):
             input, target = data
+            targets = np.append(targets, target)
 
             input = input.cuda(non_blocking=True)
             target = target.cuda(non_blocking=True).reshape(-1)
             data_time.update(time.time() - end)
 
             output = model(input)
+            outputs = np.append(outputs, torch.argmax(output.detach().cpu(), dim=1).numpy())
             loss = criterion(output, target)
 
             # measure accuracy and record loss
@@ -99,6 +106,12 @@ def validate(cfg, val_loader, model, criterion, epoch, summary, phase="val"):
     # write summary
     summary.add_scalar("Loss/" + phase, losses.avg, epoch)
     summary.add_scalar("Acc/" + phase, accuracy.avg, epoch)
+
+    outputs = outputs.reshape(-1)
+    targets = targets.reshape(-1)
+    val_acc = accuracy_score(outputs, targets)
+    val_f1 = f1_score(outputs, targets, average='macro')
+    return val_acc, val_f1
 
 
 class AverageMeter(object):

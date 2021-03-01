@@ -2,9 +2,10 @@ import torch
 import torch.nn as nn
 import torch.backends.cudnn as cudnn
 import numpy as np
-from torch.utils.data import random_split
+from torch.utils.data import random_split, ConcatDataset
 from torch.utils.tensorboard import SummaryWriter
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import accuracy_score, f1_score
 
 from datasets.hapt_dataset import HaptDataset
 from datasets.hapt_raw_dataset import HaptRawDataset
@@ -20,37 +21,54 @@ train_y_data_path = r"C:\Code\Projects\Dance\Data\HAPT Data Set\Train\y_train.tx
 test_x_data_path = r"C:\Code\Projects\Dance\Data\HAPT Data Set\Test\X_test.txt"
 test_y_data_path = r"C:\Code\Projects\Dance\Data\HAPT Data Set\Test\y_test.txt"
 
-train_val_ratio = 0.8
+split_k = 4
 batch_size = 16
 num_workers = 4
-total_epoch = 100
+total_epoch = 15
 learning_rate = 0.0001
 
 model_name = 'cnn'
 
+
 def main():
+    fold_dataset_list, test_dataset = split_k_fold(split_k)
+    val_acc_sum = 0
+    val_f1_sum = 0
+    for val_idx in range(split_k):
+        fold_train_dataset = ConcatDataset(fold_dataset_list[:val_idx] + fold_dataset_list[val_idx + 1:])
+        fold_val_dataset = fold_dataset_list[val_idx]
+        val_acc, val_f1 = train_single_fold(fold_train_dataset, fold_val_dataset, test_dataset)
+        val_acc_sum += val_acc
+        val_f1_sum += val_f1
+    val_acc_avg = val_acc_sum / split_k
+    val_f1_avg = val_f1_sum / split_k
+    print("========================================")
+    print("Results from k={} fold cross validation:".format(split_k))
+    print("Validation Accuracy: {}".format(val_acc_avg))
+    print("Validation F1 Score: {}".format(val_f1_avg))
+
+
+def split_k_fold(k):
+    dataset = None
+    test_dataset = None
     if model_name == 'mlp' or model_name == 'knn':
         dataset = HaptDataset(train_x_data_path, train_y_data_path)
         test_dataset = HaptDataset(test_x_data_path, test_y_data_path)
-        train_length = int(len(dataset) * train_val_ratio)
-        val_length = len(dataset) - train_length
-        train_dataset, val_dataset = random_split(dataset, [train_length, val_length], generator=torch.Generator().manual_seed(7))
-
-        # mean, std = dataset.get_mean_std(train_dataset.indices)
-        # dataset.normalize(mean, std)
-        # test_dataset.normalize(mean, std)
-
-        if model_name == 'mlp':
-            train_mlp(train_dataset, val_dataset, test_dataset)
-        elif model_name == 'knn':
-            train_knn(train_dataset, val_dataset, test_dataset)
-
-    if model_name == 'cnn':
+    elif model_name == 'cnn':
         dataset = HaptRawDataset(raw_json_path, Float16ToInt8())
-        train_length = int(len(dataset) * train_val_ratio)
-        val_length = len(dataset) - train_length
-        train_dataset, val_dataset = random_split(dataset, [train_length, val_length], generator=torch.Generator().manual_seed(7))
-        train_cnn(train_dataset, val_dataset)
+    fold_length = len(dataset) // k
+    fold_length_list = [fold_length for _ in range(k)]
+    fold_dataset_list = random_split(dataset, fold_length_list, generator=torch.Generator().manual_seed(7))
+    return fold_dataset_list, test_dataset
+
+
+def train_single_fold(train_dataset, val_dataset, test_dataset):
+    if model_name == 'mlp':
+        return train_mlp(train_dataset, val_dataset, test_dataset)
+    elif model_name == 'knn':
+        return train_knn(train_dataset, val_dataset, test_dataset)
+    elif model_name == 'cnn':
+        return train_cnn(train_dataset, val_dataset)
 
 
 def train_knn(train_dataset, val_dataset, test_dataset):
@@ -80,15 +98,22 @@ def train_knn(train_dataset, val_dataset, test_dataset):
     knn.fit(train_x, train_y)
     val_output = knn.predict(val_x)
     val_output, val_y = np.asarray(val_output), np.asarray(val_y)
-    correct = (val_output == val_y).sum()
-    val_acc = correct / len(val_output)
-    print("Val Accuracy: ", val_acc)
+    val_acc = accuracy_score(val_output, val_y)
+    val_f1 = f1_score(val_output, val_y, average='macro')
+    # correct = (val_output == val_y).sum()
+    # val_acc = correct / len(val_output)
+    # print("Val Accuracy: ", val_acc)
 
-    test_output = knn.predict(test_x)
-    test_output, test_y = np.asarray(test_output), np.asarray(test_y)
-    correct = (test_output == test_y).sum()
-    test_acc = correct / len(test_output)
-    print("Test Accuracy: ", test_acc)
+    # test eval
+    if test_dataset:
+        test_output = knn.predict(test_x)
+        test_output, test_y = np.asarray(test_output), np.asarray(test_y)
+        test_acc = accuracy_score(test_output, test_y)
+        # correct = (test_output == test_y).sum()
+        # test_acc = correct / len(test_output)
+        print("Test Accuracy: ", test_acc)
+
+    return val_acc, val_f1
 
 
 def train_cnn(train_dataset, val_dataset):
@@ -119,9 +144,15 @@ def train_cnn(train_dataset, val_dataset):
         pin_memory=True
     )
     summary = SummaryWriter()
+    best_val_acc = 0
+    best_val_f1 = 0
     for epoch in range(total_epoch):
         train(config, train_loader, model, criterion, optimizer, epoch, summary)
-        validate(config, val_loader, model, criterion, epoch, summary)
+        val_acc, val_f1 = validate(config, val_loader, model, criterion, epoch, summary)
+        if val_f1 > best_val_f1:
+            best_val_acc = val_acc
+            best_val_f1 = val_f1
+    return best_val_acc, best_val_f1
 
 
 def train_mlp(train_dataset, val_dataset, test_dataset):
@@ -159,11 +190,19 @@ def train_mlp(train_dataset, val_dataset, test_dataset):
         pin_memory=True
     )
     summary = SummaryWriter()
+    best_val_acc = 0
+    best_val_f1 = 0
     for epoch in range(total_epoch):
         train(config, train_loader, model, criterion, optimizer, epoch, summary)
-        validate(config, val_loader, model, criterion, epoch, summary)
-        validate(config, test_loader, model, criterion, epoch, summary, "test")
+        val_acc, val_f1 = validate(config, val_loader, model, criterion, epoch, summary)
+        if test_dataset:
+            validate(config, test_loader, model, criterion, epoch, summary, "test")
         save_checkpoint(model, epoch, optimizer, './checkpoints', 'checkpoint_mlp.pth.tar')
+        if val_f1 > best_val_f1:
+            save_checkpoint(model, epoch, optimizer, './checkpoints', 'best_mlp.pth.tar')
+            best_val_acc = val_acc
+            best_val_f1 = val_f1
+    return best_val_acc, best_val_f1
 
 
 if __name__ == "__main__":
