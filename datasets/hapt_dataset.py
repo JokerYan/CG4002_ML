@@ -59,6 +59,7 @@ class HaptDataset(Dataset):
                     feature_idx_list.append(i)
                     break
         self.input_list = self.input_list[:, feature_idx_list]
+        print('Number of features selected: {}'.format(self.input_list.shape[1]))
         return self.input_list
 
     def input_size(self):

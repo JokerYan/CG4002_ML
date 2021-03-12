@@ -1,5 +1,7 @@
 *.pyc
 *.xlsx
+*.pickle
 
 checkpoints/
+runs/
 .idea/

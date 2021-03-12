@@ -1,8 +1,9 @@
 import torch
 import time
 import numpy as np
+import pickle
 
-from sklearn.metrics import accuracy_score, f1_score
+from sklearn.metrics import accuracy_score, f1_score, confusion_matrix
 
 from core.evaluate import cal_accuracy
 
@@ -56,7 +57,7 @@ def train(cfg, train_loader, model, criterion, optimizer, epoch, summary):
     summary.add_scalar("Acc/train", accuracy.avg, epoch)
 
 
-def validate(cfg, val_loader, model, criterion, epoch, summary, phase="val"):
+def validate(cfg, val_loader, model, criterion, epoch, summary, phase="val", print_output=False):
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
@@ -70,12 +71,16 @@ def validate(cfg, val_loader, model, criterion, epoch, summary, phase="val"):
         for i, data in enumerate(val_loader):
             input, target = data
             targets = np.append(targets, target)
+            if print_output:
+                print(input)
 
             input = input.cuda(non_blocking=True)
             target = target.cuda(non_blocking=True).reshape(-1)
             data_time.update(time.time() - end)
 
             output = model(input)
+            intermediate_data = model.module.intermediate_data
+            pickle.dump(intermediate_data, open('intermediate_data.pickle', 'wb+'))
             outputs = np.append(outputs, torch.argmax(output.detach().cpu(), dim=1).numpy())
             loss = criterion(output, target)
 
@@ -111,6 +116,9 @@ def validate(cfg, val_loader, model, criterion, epoch, summary, phase="val"):
     targets = targets.reshape(-1)
     val_acc = accuracy_score(outputs, targets)
     val_f1 = f1_score(outputs, targets, average='macro')
+    if print_output:
+        print(outputs)
+    print(confusion_matrix(outputs, targets))
     return val_acc, val_f1
 
 

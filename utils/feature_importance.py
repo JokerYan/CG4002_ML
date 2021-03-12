@@ -11,10 +11,11 @@ import matplotlib.pyplot as plt
 from torch.utils.data import random_split
 
 from datasets.hapt_dataset import HaptDataset, array_to_one_hot
-from train import train_x_data_path, train_y_data_path, train_val_ratio, batch_size, num_workers
+from train import train_x_data_path, train_y_data_path, batch_size, num_workers
 from models.hapt_mlp_model import HaptMlpModel
 from utils.model_utils import load_checkpoint
 
+train_val_ratio = 0.7
 checkpoint_dir = './checkpoints'
 checkpoint_filename = 'checkpoint_mlp.pth.tar'
 

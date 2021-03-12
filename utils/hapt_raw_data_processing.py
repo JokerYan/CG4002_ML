@@ -1,5 +1,5 @@
 import os
-import json
+import pickle
 
 from tqdm import tqdm
 
@@ -8,7 +8,7 @@ from datasets.hapt_raw_dataset import HaptRawDataset
 data_root = r"C:\Code\Projects\Dance\Data\HAPT Data Set"
 raw_dir = os.path.join(data_root, "RawData")
 label_dir = os.path.join(raw_dir, 'labels.txt')
-output_json_path = os.path.join(data_root, 'raw_window_data.json')
+output_pickle_path = os.path.join(data_root, 'raw_window_data.pickle')
 
 window_size = 128
 window_overlap = 0.5
@@ -71,14 +71,14 @@ def main():
                 'gyro_window': gyro_windows[i],
                 'label': label_data_dict['label']
             })
-    with open(output_json_path, 'w+') as output_json_file:
-        output_json_file.write(json.dumps(window_data))
+    with open(output_pickle_path, 'wb') as output_pickle_file:
+        output_pickle_file.write(pickle.dumps(window_data))
 
 
 def test_raw_dataset():
-    dataset = HaptRawDataset(output_json_path)
-    dataset.__getitem__(0)
+    dataset = HaptRawDataset(output_pickle_path)
+    print(dataset.__getitem__(0)[0].shape)
 
 if __name__ == '__main__':
-    main()
-    # test_raw_dataset()
+    # main()
+    test_raw_dataset()

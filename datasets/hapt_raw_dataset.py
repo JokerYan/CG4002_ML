@@ -1,6 +1,5 @@
 import os
-import cv2
-import json
+import pickle
 import torch
 import numpy as np
 from torch.utils.data import Dataset
@@ -18,8 +17,8 @@ def array_to_one_hot(array, max_class=None):
 class HaptRawDataset(Dataset):
     def __init__(self, data_json_path, transform=None):
         self.transform = transform
-        with open(data_json_path, 'r') as data_json_file:
-            self.data_json = json.loads(data_json_file.read())
+        with open(data_json_path, 'rb') as data_json_file:
+            self.data_json = pickle.load(data_json_file)
 
     def __len__(self):
         return len(self.data_json)
