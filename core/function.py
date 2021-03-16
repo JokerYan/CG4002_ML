@@ -7,7 +7,8 @@ from sklearn.metrics import accuracy_score, f1_score, confusion_matrix
 
 from core.evaluate import cal_accuracy
 
-def train(cfg, train_loader, model, criterion, optimizer, epoch, summary):
+def train(cfg, train_loader, model, criterion, optimizer, epoch,
+          summary, device='cuda'):
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
@@ -19,8 +20,9 @@ def train(cfg, train_loader, model, criterion, optimizer, epoch, summary):
         input, target = data
         data_time.update(time.time() - end)
 
+        input = input.to(device)
         output = model(input)
-        target = target.cuda(non_blocking=True).reshape(-1)
+        target = target.to(device).reshape(-1)
 
         loss = criterion(output, target)
 
@@ -57,7 +59,8 @@ def train(cfg, train_loader, model, criterion, optimizer, epoch, summary):
     summary.add_scalar("Acc/train", accuracy.avg, epoch)
 
 
-def validate(cfg, val_loader, model, criterion, epoch, summary, phase="val", print_output=False):
+def validate(cfg, val_loader, model, criterion, epoch, summary,
+             phase="val", print_output=False, device='cuda'):
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
@@ -74,13 +77,13 @@ def validate(cfg, val_loader, model, criterion, epoch, summary, phase="val", pri
             if print_output:
                 print(input)
 
-            input = input.cuda(non_blocking=True)
-            target = target.cuda(non_blocking=True).reshape(-1)
+            input = input.to(device)
+            target = target.to(device).reshape(-1)
             data_time.update(time.time() - end)
 
             output = model(input)
-            intermediate_data = model.module.intermediate_data
-            pickle.dump(intermediate_data, open('intermediate_data.pickle', 'wb+'))
+            # intermediate_data = model.intermediate_data
+            # pickle.dump(intermediate_data, open('intermediate_data.pickle', 'wb+'))
             outputs = np.append(outputs, torch.argmax(output.detach().cpu(), dim=1).numpy())
             loss = criterion(output, target)
 

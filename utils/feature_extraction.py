@@ -44,7 +44,7 @@ def extract_instance_feature(data_instance):
     return feature_vec, label
 
 
-def extract_dataset_feature(raw_dataset):
+def extract_raw_dataset_feature(raw_dataset):
     feature_dataset = []
     for i in range(len(raw_dataset)):
         feature_vec, label = extract_instance_feature(raw_dataset[i])
@@ -70,7 +70,7 @@ def save_feature_dataset(feature_dataset):
 def main():
     dataset = HaptRawDataset(output_pickle_path)
     # extract_instance_feature(dataset.__getitem__(0))
-    feature_dataset = extract_dataset_feature(dataset)
+    feature_dataset = extract_raw_dataset_feature(dataset)
     save_feature_dataset(feature_dataset)
 
 

@@ -7,11 +7,13 @@ from torch.utils.tensorboard import SummaryWriter
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import accuracy_score, f1_score, confusion_matrix
 
+from datasets.dance_dataset import DanceDataset
 from datasets.hapt_dataset import HaptDataset
 from datasets.hapt_raw_dataset import HaptRawDataset
 from core.function import train, validate
 from models.hapt_mlp_model import HaptMlpModel
 from models.hapt_cnn_model import HaptCnnModel
+from utils.collected_data_process import get_collected_data
 from utils.hapt_raw_data_processing import output_pickle_path as raw_json_path
 from utils.model_utils import save_checkpoint
 from utils.transforms import Float16ToInt8
@@ -53,7 +55,9 @@ def main():
 def split_k_fold(k):
     dataset = None
     if model_name == 'mlp' or model_name == 'knn':
-        dataset = HaptDataset(train_x_data_path, train_y_data_path, target_features=target_features)
+        feature_data_list = get_collected_data()
+        dataset = DanceDataset(feature_data_list)
+        # dataset = HaptDataset(train_x_data_path, train_y_data_path, target_features=target_features)
         # test_dataset = HaptDataset(test_x_data_path, test_y_data_path, target_features=target_features)
     elif model_name == 'cnn':
         dataset = HaptRawDataset(raw_json_path)
@@ -109,7 +113,6 @@ def train_cnn(train_dataset, val_dataset):
     torch.backends.cudnn.enabled = True
     config = {'output_size': 12, 'print_freq': 100}
     model = HaptCnnModel(config).cuda()
-    model = nn.DataParallel(model).cuda()
     criterion = nn.CrossEntropyLoss().cuda()
     optimizer = torch.optim.Adam(
         # model.parameters(),
@@ -151,7 +154,7 @@ def train_mlp(train_dataset, val_dataset):
     input_size = train_dataset.datasets[0].dataset.input_size()
     config = {'input_size': input_size, 'output_size': 12, 'print_freq': 100}
     model = HaptMlpModel(config).cuda()
-    model = nn.DataParallel(model).cuda()
+
     criterion = nn.CrossEntropyLoss().cuda()
     optimizer = torch.optim.Adam(
         # model.parameters(),

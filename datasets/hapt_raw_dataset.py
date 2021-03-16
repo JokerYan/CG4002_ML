@@ -5,15 +5,6 @@ import numpy as np
 from torch.utils.data import Dataset
 
 
-def array_to_one_hot(array, max_class=None):
-    array = np.array(array)
-    if not max_class:
-        max_class = array.max()
-    one_hot = np.zeros((array.size, max_class))
-    one_hot[np.arange(array.size), array] = 1
-    return one_hot
-
-
 class HaptRawDataset(Dataset):
     def __init__(self, data_json_path, transform=None):
         self.transform = transform
