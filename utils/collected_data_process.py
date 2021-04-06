@@ -6,12 +6,14 @@ import numpy as np
 
 from utils.feature_extraction import extract_instance_feature
 
-data_root = r'C:\Code\Projects\Dance\Data'
-data_folder = r'data_collect_v1'
+data_root = r'C:\Code\Projects\Dance\CG4002\Ultra96'
+data_folder = r'data'
+val_data_folder = r'val_data'
 
 data_rate = 20  # assume 20Hz
-window_size = 30  # 1.5s
+window_size = 50  # 2.5s
 discarded_size = 600  # 30s discarded at the start
+reading_count = 12  # two bluno, each 6 readings
 
 normalize_output_min = -1
 normalize_output_max = 1
@@ -21,6 +23,14 @@ dance_move_idx_dict = {
     'gun': 1,
     'hair': 2,
     'sidepump': 3,
+    'pointhigh': 4,
+    'elbowkick': 5,
+    'listen': 6,
+    'dab': 7,
+    'wipetable': 8,
+    'logout': 9,
+    'left': 10,
+    'right': 11,
 }
 
 
@@ -37,15 +47,21 @@ def get_window_from_raw(raw_data):
     return windows
 
 
-def get_window_raw_data_list():
+def get_window_raw_data_list(val=False):
     window_raw_data_list = []
-    for file_path in glob(os.path.join(data_root, data_folder, '*')):
+    target_data_folder = data_folder if not val else val_data_folder
+    for file_path in glob(os.path.join(data_root, target_data_folder, '*')):
+        # if 'left' not in file_path and 'right' not in file_path and 'still' not in file_path:
+        #     continue
+        # if 'left' in file_path or 'right' in file_path:
+        #     continue
         match = re.search(r'\\([^\\]*)_([^\\]*)_(?:[^\\]*)$', file_path)
         dancer_id = match.group(1)
         dance_move = match.group(2)
         label = dance_move_idx_dict[dance_move]
 
         data = pickle.load(open(file_path, 'rb'))
+        data = data[:reading_count][:]
         windows = get_window_from_raw(data)
         for window in windows:
             window_raw_data_list.append((window, label))
@@ -61,14 +77,30 @@ def get_feature_data_list(window_raw_data_list):
     return feature_data_list
 
 
+def save_normalize_data(feature_min, feature_max):
+    pickle.dump({
+        "feature_min": feature_min,
+        "feature_max": feature_max,
+    }, open('feature_normalize_data.pickle', 'wb'))
+
+def load_normalize_data():
+    features = pickle.load(open('feature_normalize_data.pickle', 'rb'))
+    feature_min = features['feature_min'].reshape(-1)
+    feature_max = features['feature_max'].reshape(-1)
+    return feature_min, feature_max
+
 # using simple min max
-def normalize_feature_data_list(feature_data_list):
+def normalize_feature_data_list(feature_data_list, val=False):
     feature_matrix = [feature_data for feature_data, label in feature_data_list]
     feature_matrix = np.array(feature_matrix).transpose()
     feature_max = np.max(feature_matrix, axis=1).reshape((-1, 1))
     feature_min = np.min(feature_matrix, axis=1).reshape((-1, 1))
+    if val:
+        feature_min, feature_max = load_normalize_data()
+        feature_min, feature_max = feature_min.reshape((-1, 1)), feature_max.reshape((-1, 1))
+    else:
+        save_normalize_data(feature_min, feature_max)
     feature_range = (feature_max - feature_min) / (normalize_output_max - normalize_output_min)
-    # feature_normalized_matrix = np.subtract(feature_matrix, feature_min)
     feature_normalized_matrix = (feature_matrix - feature_min) / feature_range + normalize_output_min
     for i in range(len(feature_data_list)):
         label = feature_data_list[i][1]
@@ -76,10 +108,10 @@ def normalize_feature_data_list(feature_data_list):
     return feature_data_list
 
 
-def get_collected_data():
-    window_raw_data_list = get_window_raw_data_list()
+def get_collected_data(val=False):
+    window_raw_data_list = get_window_raw_data_list(val)
     feature_data_list = get_feature_data_list(window_raw_data_list)
-    normalized_feature_data_list = normalize_feature_data_list(feature_data_list)
+    normalized_feature_data_list = normalize_feature_data_list(feature_data_list, val)
     return normalized_feature_data_list
 
 

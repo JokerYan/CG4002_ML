@@ -24,10 +24,11 @@ train_y_data_path = r"C:\Code\Projects\Dance\Data\HAPT Data Set\Train\y_train.tx
 test_x_data_path = r"C:\Code\Projects\Dance\Data\HAPT Data Set\Test\X_test.txt"
 test_y_data_path = r"C:\Code\Projects\Dance\Data\HAPT Data Set\Test\y_test.txt"
 
+use_k_fold = False
 split_k = 4
 batch_size = 16
 num_workers = 4
-total_epoch = 15
+total_epoch = 100
 learning_rate = 0.0001
 target_features = []
 
@@ -35,17 +36,26 @@ model_name = 'mlp'
 
 
 def main():
-    fold_dataset_list = split_k_fold(split_k)
+    # fold_dataset_list = split_k_fold(split_k)
     val_acc_sum = 0
     val_f1_sum = 0
     for val_idx in range(split_k):
-        fold_train_dataset = ConcatDataset(fold_dataset_list[:val_idx] + fold_dataset_list[val_idx + 1:])
-        fold_val_dataset = fold_dataset_list[val_idx]
-        val_acc, val_f1 = train_single_fold(fold_train_dataset, fold_val_dataset)
+        # fold_train_dataset = ConcatDataset(fold_dataset_list[:val_idx] + fold_dataset_list[val_idx + 1:])
+        # fold_val_dataset = fold_dataset_list[val_idx]
+        # val_acc, val_f1 = train_single_fold(fold_train_dataset, fold_val_dataset)
+
+        train_feature_data_list = get_collected_data(val=False)
+        train_dataset = DanceDataset(train_feature_data_list)
+        val_feature_data_list = get_collected_data(val=True)
+        val_dataset = DanceDataset(val_feature_data_list)
+
+        val_acc, val_f1 = train_single_fold(train_dataset, val_dataset)
         val_acc_sum += val_acc
         val_f1_sum += val_f1
-    val_acc_avg = val_acc_sum / split_k
-    val_f1_avg = val_f1_sum / split_k
+        if not use_k_fold:
+            break
+    val_acc_avg = val_acc_sum / split_k if use_k_fold else val_acc_sum
+    val_f1_avg = val_f1_sum / split_k if use_k_fold else val_f1_sum
     print("========================================")
     print("Results from k={} fold cross validation:".format(split_k))
     print("Validation Accuracy: {}".format(val_acc_avg))
@@ -151,11 +161,13 @@ def train_mlp(train_dataset, val_dataset):
     cudnn.benchmark = True
     torch.backends.cudnn.deterministic = False
     torch.backends.cudnn.enabled = True
-    input_size = train_dataset.datasets[0].dataset.input_size()
+    input_size = train_dataset.input_size()
     config = {'input_size': input_size, 'output_size': 12, 'print_freq': 100}
     model = HaptMlpModel(config).cuda()
 
-    criterion = nn.CrossEntropyLoss().cuda()
+    weight_tensor = [1 for _ in range(config['output_size'] - 2)] + [10, 10]
+    criterion = nn.CrossEntropyLoss(torch.Tensor(weight_tensor)).cuda()
+    # criterion = nn.CrossEntropyLoss(torch.Tensor([0.1, 0.1, 0.1, 0.1])).cuda()
     optimizer = torch.optim.Adam(
         # model.parameters(),
         filter(lambda p: p.requires_grad, model.parameters()),

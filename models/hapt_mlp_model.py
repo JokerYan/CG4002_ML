@@ -11,7 +11,7 @@ class HaptMlpModel(nn.Module):
         self.quant = torch.quantization.QuantStub()
         self.dequant = torch.quantization.DeQuantStub()
 
-        self.hidden_size = 128
+        self.hidden_size = 256
         self.hidden_layer_count = 3
         self.input_layer = nn.Linear(cfg['input_size'], self.hidden_size)
         fc_list = [nn.Linear(self.hidden_size, self.hidden_size) for _ in range(self.hidden_layer_count - 1)]

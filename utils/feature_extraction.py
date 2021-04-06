@@ -1,6 +1,9 @@
 import os
 import numpy as np
+from scipy.fft import fft, fftfreq
+
 from datasets.hapt_raw_dataset import HaptRawDataset
+from sklearn.linear_model import LinearRegression
 
 data_root = r"C:\Code\Projects\Dance\Data\HAPT Data Set"
 output_pickle_path = os.path.join(data_root, 'raw_window_data.pickle')
@@ -29,6 +32,26 @@ def extract_min(raw_data):
     return min_vec
 
 
+def extract_linear(raw_data):
+    x = np.array([i for i in range(raw_data.shape[1])]).reshape(-1, 1)
+    coef_list = []
+    for data in raw_data:
+        reg = LinearRegression().fit(x, data)
+        coef_list.append(reg.coef_[0])
+    return np.array(coef_list)
+
+
+def extract_fft(data):
+    yf_list = []
+    for sensor_data in data:
+        N = 20
+        T = 1 / 20
+        yf = fft(sensor_data)
+        yf = 2.0 / N * np.abs(yf[0:N // 2])
+        yf_list.append(yf)
+    return np.array(yf_list).reshape(-1)
+
+
 def extract_instance_feature(data_instance):
     raw_data, label = data_instance
     feature_extractions = [
@@ -36,6 +59,8 @@ def extract_instance_feature(data_instance):
         extract_std,
         extract_max,
         extract_min,
+        extract_linear,
+        extract_fft,
     ]
     feature_vec = np.array([])
     for extraction in feature_extractions:

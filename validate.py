@@ -36,17 +36,20 @@ device = 'cpu'
 
 def main():
     if model_name == 'mlp' or model_name == 'knn':
-        feature_data_list = get_collected_data()
-        dataset = DanceDataset(feature_data_list)
+        train_feature_data_list = get_collected_data(val=False)
+        train_dataset = DanceDataset(train_feature_data_list)
+        val_feature_data_list = get_collected_data(val=True)
+        val_dataset = DanceDataset(val_feature_data_list)
         # dataset = HaptDataset(train_x_data_path, train_y_data_path, target_features=target_features)
     elif model_name == 'cnn':
         dataset = HaptRawDataset(raw_json_path)
-    train_length = len(dataset) - val_length
-    train_dataset, val_dataset = random_split(dataset, [train_length, val_length], generator=torch.Generator().manual_seed(7))
+    # train_length = len(dataset) - val_length
+    # train_dataset, val_dataset = random_split(dataset, [train_length, val_length], generator=torch.Generator().manual_seed(7))
+
 
     model = None
     if model_name == 'mlp':
-        input_size = train_dataset.dataset.input_size()
+        input_size = train_dataset.input_size()
         config = {'input_size': input_size, 'output_size': 12, 'print_freq': 100}
         model = HaptMlpModel(config)
         load_checkpoint(model, './checkpoints', 'best_mlp.pth.tar')
